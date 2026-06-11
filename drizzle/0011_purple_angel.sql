@@ -1,0 +1,1 @@
+ALTER TABLE `members` ADD `member_level_id` integer REFERENCES member_levels(id);

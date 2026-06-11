@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `original_password` text;
