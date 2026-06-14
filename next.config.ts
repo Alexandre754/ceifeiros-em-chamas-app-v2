@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
-const LOADER = path.resolve(__dirname, 'src/visual-edits/component-tagger-loader.js');
+const LOADER = path.resolve(import.meta.dirname, 'src/visual-edits/component-tagger-loader.js');
 
 const nextConfig: NextConfig = {
   images: {
@@ -16,7 +16,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  outputFileTracingRoot: path.resolve(__dirname, '../../'),
+  outputFileTracingRoot: path.resolve(import.meta.dirname, '../../'),
   typescript: {
     ignoreBuildErrors: true,
   },
