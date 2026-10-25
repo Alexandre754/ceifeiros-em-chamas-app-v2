@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `has_general_access` integer DEFAULT false;
