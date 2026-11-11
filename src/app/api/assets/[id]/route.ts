@@ -4,6 +4,8 @@ import { assets, users, congregations } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 
+export const dynamic = 'force-dynamic';
+
 const JWT_SECRET = process.env.JWT_SECRET || 'ipcecma-secret-key-2024';
 
 interface JWTPayload {
@@ -48,28 +50,23 @@ async function checkAssetPermission(
   userPayload: JWTPayload,
   requireModify: boolean = false
 ): Promise<{ allowed: boolean; error?: string }> {
-  // membro cannot modify or delete
   if (requireModify && userPayload.role === 'membro') {
     return { allowed: false, error: 'Members do not have permission to modify or delete assets' };
   }
 
-  // admin_geral has full access
   if (userPayload.role === 'admin_geral') {
     return { allowed: true };
   }
 
-  // Check if user's congregation is headquarters
   const userCongregation = await db.select()
     .from(congregations)
     .where(eq(congregations.id, userPayload.congregationId))
     .limit(1);
 
-  // admin_sede from headquarters has full access
   if (userPayload.role === 'admin_sede' && userCongregation[0]?.isHeadquarters) {
     return { allowed: true };
   }
 
-  // admin_congregacao and membro can only access their congregation's assets
   if (userPayload.role === 'admin_congregacao' || userPayload.role === 'membro') {
     if (assetCongregationId !== userPayload.congregationId) {
       return { allowed: false, error: 'You do not have permission to access this asset' };
@@ -77,7 +74,6 @@ async function checkAssetPermission(
     return { allowed: true };
   }
 
-  // admin_sede from non-headquarters can only access their congregation
   if (userPayload.role === 'admin_sede') {
     if (assetCongregationId !== userPayload.congregationId) {
       return { allowed: false, error: 'You do not have permission to access this asset' };
@@ -93,7 +89,6 @@ export async function GET(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Verify JWT token
     const userPayload = await verifyToken(request);
     if (!userPayload) {
       return NextResponse.json(
@@ -102,7 +97,6 @@ export async function GET(
       );
     }
 
-    // Validate id parameter
     const params = await context.params;
     const id = params.id;
     if (!id || isNaN(parseInt(id))) {
@@ -112,7 +106,6 @@ export async function GET(
       );
     }
 
-    // Query asset with join to congregations
     const asset = await db.select({
       id: assets.id,
       congregationId: assets.congregationId,
@@ -145,7 +138,6 @@ export async function GET(
       .where(eq(assets.id, parseInt(id)))
       .limit(1);
 
-    // Check if asset exists
     if (asset.length === 0) {
       return NextResponse.json(
         { error: 'Asset not found', code: 'NOT_FOUND' },
@@ -153,7 +145,6 @@ export async function GET(
       );
     }
 
-    // Check permission
     const permissionCheck = await checkAssetPermission(
       asset[0].congregationId,
       userPayload,
@@ -182,7 +173,6 @@ export async function PUT(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Verify JWT token
     const userPayload = await verifyToken(request);
     if (!userPayload) {
       return NextResponse.json(
@@ -191,7 +181,6 @@ export async function PUT(
       );
     }
 
-    // Validate id parameter
     const params = await context.params;
     const id = params.id;
     if (!id || isNaN(parseInt(id))) {
@@ -201,7 +190,6 @@ export async function PUT(
       );
     }
 
-    // Check if asset exists
     const existingAsset = await db.select()
       .from(assets)
       .where(eq(assets.id, parseInt(id)))
@@ -214,7 +202,6 @@ export async function PUT(
       );
     }
 
-    // Check permission (requireModify = true)
     const permissionCheck = await checkAssetPermission(
       existingAsset[0].congregationId,
       userPayload,
@@ -228,10 +215,8 @@ export async function PUT(
       );
     }
 
-    // Parse request body
     const body: AssetUpdatePayload = await request.json();
 
-    // Validate name if provided
     if (body.name !== undefined && body.name.trim() === '') {
       return NextResponse.json(
         { error: 'Name cannot be empty', code: 'INVALID_NAME' },
@@ -239,7 +224,6 @@ export async function PUT(
       );
     }
 
-    // Validate category if provided
     if (body.category !== undefined) {
       const validCategories = ['imovel', 'veiculo', 'equipamento', 'ferramenta'];
       if (!validCategories.includes(body.category)) {
@@ -250,7 +234,6 @@ export async function PUT(
       }
     }
 
-    // Validate propertyType if provided
     if (body.propertyType !== undefined) {
       const validPropertyTypes = ['proprio', 'alugado'];
       if (!validPropertyTypes.includes(body.propertyType)) {
@@ -261,7 +244,6 @@ export async function PUT(
       }
     }
 
-    // Validate condition if provided
     if (body.condition !== undefined) {
       const validConditions = ['otimo', 'bom', 'regular', 'ruim'];
       if (!validConditions.includes(body.condition)) {
@@ -272,7 +254,6 @@ export async function PUT(
       }
     }
 
-    // Validate acquisitionValue if provided
     if (body.acquisitionValue !== undefined && body.acquisitionValue < 0) {
       return NextResponse.json(
         { error: 'Acquisition value must be non-negative', code: 'INVALID_ACQUISITION_VALUE' },
@@ -280,7 +261,6 @@ export async function PUT(
       );
     }
 
-    // Validate currentValue if provided
     if (body.currentValue !== undefined && body.currentValue < 0) {
       return NextResponse.json(
         { error: 'Current value must be non-negative', code: 'INVALID_CURRENT_VALUE' },
@@ -288,7 +268,6 @@ export async function PUT(
       );
     }
 
-    // Prepare update object with trimmed strings
     const updateData: any = {
       updatedAt: new Date().toISOString(),
     };
@@ -306,13 +285,11 @@ export async function PUT(
     if (body.serialNumber !== undefined) updateData.serialNumber = body.serialNumber ? body.serialNumber.trim() : null;
     if (body.photoUrl !== undefined) updateData.photoUrl = body.photoUrl ? body.photoUrl.trim() : null;
 
-    // Update asset with returning
     const updated = await db.update(assets)
       .set(updateData)
       .where(eq(assets.id, parseInt(id)))
       .returning();
 
-    // Return updated asset with join
     const updatedAsset = await db.select({
       id: assets.id,
       congregationId: assets.congregationId,
@@ -360,7 +337,6 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Verify JWT token
     const userPayload = await verifyToken(request);
     if (!userPayload) {
       return NextResponse.json(
@@ -369,7 +345,6 @@ export async function DELETE(
       );
     }
 
-    // Validate id parameter
     const params = await context.params;
     const id = params.id;
     if (!id || isNaN(parseInt(id))) {
@@ -379,7 +354,6 @@ export async function DELETE(
       );
     }
 
-    // Check if asset exists
     const existingAsset = await db.select()
       .from(assets)
       .where(eq(assets.id, parseInt(id)))
@@ -392,7 +366,6 @@ export async function DELETE(
       );
     }
 
-    // Check permission (requireModify = true)
     const permissionCheck = await checkAssetPermission(
       existingAsset[0].congregationId,
       userPayload,
@@ -406,7 +379,6 @@ export async function DELETE(
       );
     }
 
-    // Soft delete: set status='inativo', update updatedAt
     const deleted = await db.update(assets)
       .set({
         status: 'inativo',
