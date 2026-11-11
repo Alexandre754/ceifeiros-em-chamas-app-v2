@@ -95,14 +95,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(response, { status: 200 });
 
   } catch (error: any) {
-    // 🔥 AQUI ESTÁ A MUDANÇA: Vamos cuspir o erro real do banco de dados no console!
-    console.error('ERRO DETALHADO NO LOGIN:', error.cause || error);
-    
-    return NextResponse.json(
-      { 
-        error: 'Erro interno do servidor: ' + (error.cause?.message || error.message || 'Erro desconhecido')
-      },
-      { status: 500 }
-    );
-  }
+  // Log da causa real do erro (LibsqlError)
+  console.error('ERRO NA CONEXÃO COM O BANCO:', error.cause || error);
+  
+  return NextResponse.json(
+    { 
+      error: 'Erro interno do servidor: ' + (error.cause?.message || error.message || 'Erro desconhecido')
+    },
+    { status: 500 }
+  );
 }
